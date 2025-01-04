@@ -49,18 +49,12 @@ class TaskStatus(str, Enum):
 
 
 class Task(TaskModel):
-    script_params: bytes = None
+    script_params: bytes = Field(exclude=True)
     params: str
 
     def __init__(self, **kwargs):
         priority = kwargs.pop("priority", int(datetime.now(timezone.utc).timestamp() * 1000))
         super().__init__(priority=priority, **kwargs)
-
-    model_config = ConfigDict(exclude=["script_params"])
-    # TODO[pydantic]: The `Config` class inherits from another class, please create the `model_config` manually.
-    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-config for more information.
-    # class Config(TaskModel.__config__):
-    #     exclude = ["script_params"]
 
     @staticmethod
     def from_table(table: "TaskTable"):

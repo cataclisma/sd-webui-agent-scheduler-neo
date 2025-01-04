@@ -12,8 +12,8 @@ from modules.shared import list_checkpoint_tiles, refresh_checkpoints
 from modules.cmd_args import parser
 from modules.ui import create_refresh_button
 from modules.ui_common import save_files
-from modules.sd_models import model_path, model_data, select_checkpoint
-from modules.generation_parameters_copypaste import (
+from modules.sd_models import model_path, select_checkpoint
+from modules.infotext_utils import (
     registered_param_bindings,
     register_paste_params_button,
     connect_paste_params_buttons,
@@ -22,7 +22,7 @@ from modules.generation_parameters_copypaste import (
 )
 
 from agent_scheduler.task_runner import TaskRunner, get_instance
-from agent_scheduler.helpers import log, compare_components_with_ids, get_components_by_ids, is_macos
+from agent_scheduler.helpers import get_default_config_dependencies, log, compare_components_with_ids, get_components_by_ids, is_macos
 from agent_scheduler.db import init as init_db, task_manager, TaskStatus
 from agent_scheduler.api import regsiter_apis
 
@@ -147,9 +147,8 @@ class Script(scripts.Script):
         if generate is None or generate._id is None:
             return
         is_img2img = self.is_img2img
-        def_dependencies = root.default_config.get_config().get("dependencies")
         dependencies: List[dict] = [
-             x for x in def_dependencies if x["targets"][0][1] == "click" and generate._id == x["targets"][0][0]
+            x for x in get_default_config_dependencies(root) if (generate._id, "click") in x["targets"]
         ]
 
 
@@ -172,13 +171,7 @@ class Script(scripts.Script):
             if self.checkpoint_dropdown is not None:
                 self.checkpoint_dropdown.change(fn=self.on_checkpoint_changed, inputs=[self.checkpoint_dropdown])
 
-            fn_block = None
-            for key in root.fns:
-                if compare_components_with_ids(root.fns[key].inputs, dependency["inputs"]) == True:
-                    fn_block = root.fns[key]
-                    break
-
-            # fn_block = next(fn for fn in root.fns if compare_components_with_ids(fn.inputs, dependency["inputs"]))
+            fn_block = next(fn for fn in root.fns.values() if compare_components_with_ids(fn.inputs, dependency["inputs"]))
             fn = self.wrap_register_ui_task()
             inputs = fn_block.inputs.copy()
             inputs.insert(0, self.checkpoint_dropdown)
@@ -194,7 +187,7 @@ class Script(scripts.Script):
 
             if cnet_dependency is not None:
                 cnet_fn_block = next(
-                    fn for fn in root.fns if compare_components_with_ids(fn.inputs, cnet_dependency["inputs"])
+                    fn for fn in root.fns.values() if compare_components_with_ids(fn.inputs, cnet_dependency["inputs"])
                 )
                 self.submit_button.click(
                     fn=UiControlNetUnit,
@@ -227,15 +220,8 @@ class Script(scripts.Script):
 
                 
                 if checkpoint is None or checkpoint == "" or checkpoint == checkpoint_current:
-                    # print (shared)
-                    try:
-                        checkpoint = [shared.sd_model.sd_checkpoint_info.title]
-                    except:
-                        log.info ("FakeInitialModel loded at the moment")
-                        checkpoint_info = select_checkpoint()
-                        log.info ("checkpoint_info: " + checkpoint_info.title)
-                        checkpoint = [checkpoint_info.title]
-                        log.info ("Queuing with this checkpoint instead: " + checkpoint_info.title)
+                    checkpoint_info = select_checkpoint()
+                    checkpoint = [checkpoint_info.title]
                 elif checkpoint == checkpoint_runtime:
                     checkpoint = [None]
                 elif checkpoint.endswith(" checkpoints)"):

@@ -13,7 +13,7 @@ from numpy import ndarray
 from torch import Tensor
 
 from modules import sd_samplers, scripts, shared, sd_vae, images, txt2img, img2img
-from modules.generation_parameters_copypaste import create_override_settings_dict
+from modules.infotext_utils import create_override_settings_dict
 from modules.sd_models import CheckpointInfo, get_closet_checkpoint_match
 from modules.api.models import (
     StableDiffusionTxt2ImgProcessingAPI,
@@ -254,9 +254,8 @@ def map_ui_task_args_list_to_named_args(args: List, is_img2img: bool):
     script_args = args[len(arg_names) :]
 
     override_settings_texts: List[str] = named_args.get("override_settings_texts", [])
-    if override_settings_texts == None:
+    if override_settings_texts is None:
         override_settings_texts = []
-    print (override_settings_texts)
     # add clip_skip if not exist in args (vlad fork has this arg)
     if named_args.get("clip_skip", None) is None:
         clip_skip = None

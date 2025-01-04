@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional, List, Any, Dict
-from pydantic import ConfigDict, BaseModel, Field
+from pydantic import ConfigDict, BaseModel, Field, field_serializer
 
 from modules import sd_samplers
 from modules.api.models import (
@@ -16,6 +16,10 @@ def convert_datetime_to_iso_8601_with_z_suffix(dt: datetime) -> str:
 def transform_to_utc_datetime(dt: datetime) -> datetime:
     return dt.astimezone(tz=timezone.utc)
 
+def strip_schema_extra(schema: Dict[str, Any]) -> None:
+    props = schema.get("properties", {})
+    props.pop("send_images", None)
+    props.pop("save_images", None)
 
 class QueueStatusAPI(BaseModel):
     limit: Optional[int] = Field(title="Limit", description="The maximum number of tasks to return", default=20)
@@ -49,6 +53,10 @@ class TaskModel(BaseModel):
         default=None,
     )
 
+    @field_serializer('created_at', "updated_at", when_used="json")
+    def serialize_datetime(self, dt: datetime) -> int:
+        return int(dt.timestamp() * 1e3)
+
 
 class Txt2ImgApiTaskArgs(StableDiffusionTxt2ImgProcessingAPI):
     checkpoint: Optional[str] = Field(
@@ -68,22 +76,7 @@ class Txt2ImgApiTaskArgs(StableDiffusionTxt2ImgProcessingAPI):
         description="The callback URL to send the result to.",
     )
 
-    # TODO[pydantic]: The `Config` class inherits from another class, please create the `model_config` manually.
-    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-config for more information.
-    # class Config(StableDiffusionTxt2ImgProcessingAPI.__config__):
-    #     @staticmethod
-    #     def schema_extra(schema: Dict[str, Any], model) -> None:
-    #         props = schema.get("properties", {})
-    #         props.pop("send_images", None)
-    #         props.pop("save_images", None)
-    
-    def my_schema_extra(schema: Dict[str, Any]) -> None:
-            props = schema.get("properties", {})
-            props.pop("send_images", None)
-            props.pop("save_images", None)
-            # return props
-    model_config = ConfigDict(json_schema_extra=my_schema_extra,)
-    
+    model_config: ConfigDict = ConfigDict(json_schema_extra=strip_schema_extra)
 
 
 class Img2ImgApiTaskArgs(StableDiffusionImg2ImgProcessingAPI):
@@ -104,21 +97,7 @@ class Img2ImgApiTaskArgs(StableDiffusionImg2ImgProcessingAPI):
         description="The callback URL to send the result to.",
     )
 
-    def my_schema_extra(schema: Dict[str, Any]) -> None:
-            props = schema.get("properties", {})
-            props.pop("send_images", None)
-            props.pop("save_images", None)
-    model_config = ConfigDict(json_schema_extra=my_schema_extra,)
-
-    # TODO[pydantic]: The `Config` class inherits from another class, please create the `model_config` manually.
-    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-config for more information.
-    # class Config(StableDiffusionImg2ImgProcessingAPI.__config__):
-    #     @staticmethod
-    #     def schema_extra(schema: Dict[str, Any], model) -> None:
-    #         props = schema.get("properties", {})
-    #         props.pop("send_images", None)
-    #         props.pop("save_images", None)
-    
+    model_config: ConfigDict = ConfigDict(json_schema_extra=strip_schema_extra)
 
 
 class QueueTaskResponse(BaseModel):
@@ -130,21 +109,11 @@ class QueueStatusResponse(BaseModel):
     pending_tasks: List[TaskModel] = Field(title="Pending Tasks", description="The pending tasks in the queue")
     total_pending_tasks: int = Field(title="Queue length", description="The total pending tasks in the queue")
     paused: bool = Field(title="Paused", description="Whether the queue is paused")
-    # def my_schema_extra(schema: Dict[str, Any]) -> None:
-    #         props = schema.get("properties", {})
-    #         props.pop("send_images", None)
-    #         props.pop("save_images", None)
-    # TODO[pydantic]: The following keys were removed: `json_encoders`.
-    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-config for more information.
-    model_config = ConfigDict(json_encoders={datetime: lambda dt: int(dt.timestamp() * 1e3)})
 
 
 class HistoryResponse(BaseModel):
     tasks: List[TaskModel] = Field(title="Tasks")
     total: int = Field(title="Task count")
-    # TODO[pydantic]: The following keys were removed: `json_encoders`.
-    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-config for more information.
-    model_config = ConfigDict(json_encoders={datetime: lambda dt: int(dt.timestamp() * 1e3)})
 
 
 class UpdateTaskArgs(BaseModel):
