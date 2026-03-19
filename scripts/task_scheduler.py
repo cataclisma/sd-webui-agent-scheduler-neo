@@ -166,12 +166,23 @@ class Script(scripts.Script):
             elif len(d["outputs"]) == 4:
                 dependency = d
 
+        if dependency is None:
+            log.warning("[AgentScheduler] Could not find generate dependency (outputs==4). Trying fallback: largest output count.")
+            if dependencies:
+                dependency = max(dependencies, key=lambda d: len(d["outputs"]))
+            else:
+                log.error("[AgentScheduler] No dependencies found for generate button. Cannot bind Enqueue button.")
+                return
 
         with root:
             if self.checkpoint_dropdown is not None:
                 self.checkpoint_dropdown.change(fn=self.on_checkpoint_changed, inputs=[self.checkpoint_dropdown])
 
-            fn_block = next(fn for fn in root.fns.values() if compare_components_with_ids(fn.inputs, dependency["inputs"]))
+            # Neue Gradio-API: _fn ist bereits das BlockFunction-Objekt
+            if "_fn" in dependency:
+                fn_block = dependency["_fn"]
+            else:
+                fn_block = next(fn for fn in root.fns.values() if compare_components_with_ids(fn.inputs, dependency["inputs"]))
             fn = self.wrap_register_ui_task()
             inputs = fn_block.inputs.copy()
             inputs.insert(0, self.checkpoint_dropdown)
@@ -186,9 +197,12 @@ class Script(scripts.Script):
             self.submit_button.click(**args)
 
             if cnet_dependency is not None:
-                cnet_fn_block = next(
-                    fn for fn in root.fns.values() if compare_components_with_ids(fn.inputs, cnet_dependency["inputs"])
-                )
+                if "_fn" in cnet_dependency:
+                    cnet_fn_block = cnet_dependency["_fn"]
+                else:
+                    cnet_fn_block = next(
+                        fn for fn in root.fns.values() if compare_components_with_ids(fn.inputs, cnet_dependency["inputs"])
+                    )
                 self.submit_button.click(
                     fn=UiControlNetUnit,
                     inputs=cnet_fn_block.inputs,

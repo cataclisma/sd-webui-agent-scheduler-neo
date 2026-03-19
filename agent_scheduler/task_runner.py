@@ -385,7 +385,7 @@ class TaskRunner:
                             **task_meta,
                         )
                     else:
-                        geninfo = json.loads(res)
+                        geninfo = res if isinstance(res, dict) else json.loads(res)
                         result = {
                             "images": self.__saved_images_path.copy(),
                             "geninfo": geninfo,

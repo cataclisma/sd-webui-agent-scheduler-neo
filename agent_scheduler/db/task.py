@@ -3,7 +3,13 @@ import base64
 from enum import Enum
 from datetime import datetime, timezone
 from typing import Optional, Union, List, Dict
-from pydantic import ConfigDict, BaseModel, Field
+try:
+    from pydantic import ConfigDict, BaseModel, Field
+    PYDANTIC_V2 = True
+except ImportError:
+    from pydantic import BaseModel, Field
+    ConfigDict = None
+    PYDANTIC_V2 = False
 
 from sqlalchemy import (
     TypeDecorator,

@@ -1,6 +1,14 @@
 from datetime import datetime, timezone
 from typing import Optional, List, Any, Dict
-from pydantic import ConfigDict, BaseModel, Field, field_serializer
+
+try:
+    from pydantic import ConfigDict, BaseModel, Field, field_serializer
+    PYDANTIC_V2 = True
+except ImportError:
+    from pydantic import BaseModel, Field
+    ConfigDict = None
+    field_serializer = None
+    PYDANTIC_V2 = False
 
 from modules import sd_samplers
 from modules.api.models import (
@@ -16,10 +24,12 @@ def convert_datetime_to_iso_8601_with_z_suffix(dt: datetime) -> str:
 def transform_to_utc_datetime(dt: datetime) -> datetime:
     return dt.astimezone(tz=timezone.utc)
 
+
 def strip_schema_extra(schema: Dict[str, Any]) -> None:
     props = schema.get("properties", {})
     props.pop("send_images", None)
     props.pop("save_images", None)
+
 
 class QueueStatusAPI(BaseModel):
     limit: Optional[int] = Field(title="Limit", description="The maximum number of tasks to return", default=20)
@@ -53,9 +63,15 @@ class TaskModel(BaseModel):
         default=None,
     )
 
-    @field_serializer('created_at', "updated_at", when_used="json")
-    def serialize_datetime(self, dt: datetime) -> int:
-        return int(dt.timestamp() * 1e3)
+    if PYDANTIC_V2:
+        @field_serializer('created_at', "updated_at", when_used="json")
+        def serialize_datetime(self, dt: datetime) -> int:
+            return int(dt.timestamp() * 1e3)
+
+    class Config:
+        json_encoders = {
+            datetime: lambda dt: int(dt.timestamp() * 1e3)
+        }
 
 
 class Txt2ImgApiTaskArgs(StableDiffusionTxt2ImgProcessingAPI):
@@ -76,7 +92,11 @@ class Txt2ImgApiTaskArgs(StableDiffusionTxt2ImgProcessingAPI):
         description="The callback URL to send the result to.",
     )
 
-    model_config: ConfigDict = ConfigDict(json_schema_extra=strip_schema_extra)
+    if PYDANTIC_V2:
+        model_config = ConfigDict(json_schema_extra=strip_schema_extra)
+    else:
+        class Config:
+            schema_extra = staticmethod(strip_schema_extra)
 
 
 class Img2ImgApiTaskArgs(StableDiffusionImg2ImgProcessingAPI):
@@ -97,7 +117,11 @@ class Img2ImgApiTaskArgs(StableDiffusionImg2ImgProcessingAPI):
         description="The callback URL to send the result to.",
     )
 
-    model_config: ConfigDict = ConfigDict(json_schema_extra=strip_schema_extra)
+    if PYDANTIC_V2:
+        model_config = ConfigDict(json_schema_extra=strip_schema_extra)
+    else:
+        class Config:
+            schema_extra = staticmethod(strip_schema_extra)
 
 
 class QueueTaskResponse(BaseModel):

@@ -102,15 +102,46 @@ def get_components_by_ids(root: Block, ids: List[int]):
 
 
 def get_default_config_dependencies(root: Block):
-    return root.default_config.get_config().get("dependencies")
+    """
+    Kompatibilitaetsfunktion fuer alte (A1111) und neue (Forge Neo) Gradio-Versionen.
+    Alte API: dependencies als Liste von dicts in root.default_config.get_config()
+    Neue API: root.fns ist ein Dict von BlockFunction-Objekten, kein dependencies-Feld mehr.
+    """
+    # Neue Gradio-API: fns direkt in altes Format konvertieren
+    if hasattr(root, 'fns') and root.fns:
+        result = []
+        for fn in root.fns.values():
+            inputs = list(fn.inputs) if hasattr(fn, 'inputs') and fn.inputs else []
+            outputs = list(fn.outputs) if hasattr(fn, 'outputs') and fn.outputs else []
+            targets = []
+            if hasattr(fn, 'targets') and fn.targets:
+                for t in fn.targets:
+                    if isinstance(t, tuple):
+                        targets.append(t)
+                    elif hasattr(t, '_id'):
+                        targets.append((t._id, 'click'))
+            dep = {
+                'targets': targets,
+                'inputs': [c._id for c in inputs if hasattr(c, '_id')],
+                'outputs': [c._id for c in outputs if hasattr(c, '_id')],
+                '_fn': fn,
+            }
+            result.append(dep)
+        return result
+    # Alte Gradio-API (klassisches A1111)
+    try:
+        return root.default_config.get_config().get('dependencies') or []
+    except Exception:
+        return []
 
 
 def detect_control_net(root: gr.Blocks, submit: gr.Button):
     UiControlNetUnit = None
 
+    all_deps = get_default_config_dependencies(root) or []
     dependencies: List[dict] = [
         x
-        for x in get_default_config_dependencies(root)
+        for x in all_deps
         if (submit._id, "click") in x["targets"]
     ]
     for d in dependencies:

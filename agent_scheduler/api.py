@@ -19,6 +19,12 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.exceptions import HTTPException
 from pydantic import BaseModel
 
+def _model_to_dict(model):
+    """Kompatibilitätsfunktion für pydantic v1 (.dict()) und v2 (.model_dump())"""
+    if hasattr(model, "model_dump"):
+        return model.model_dump()
+    return model.dict()
+
 from modules import shared, progress, sd_models, sd_samplers
 
 from .db import Task, TaskStatus, task_manager
@@ -113,7 +119,7 @@ def regsiter_apis(app: App, task_runner: TaskRunner):
     @app.post("/agent-scheduler/v1/queue/txt2img", response_model=QueueTaskResponse, dependencies=deps)
     def queue_txt2img(body: Txt2ImgApiTaskArgs):
         task_id = str(uuid4())
-        args = body.dict()
+        args = _model_to_dict(body)
         checkpoint = args.pop("checkpoint", None)
         vae = args.pop("vae", None)
         callback_url = args.pop("callback_url", None)
@@ -136,7 +142,7 @@ def regsiter_apis(app: App, task_runner: TaskRunner):
     @app.post("/agent-scheduler/v1/queue/img2img", response_model=QueueTaskResponse, dependencies=deps)
     def queue_img2img(body: Img2ImgApiTaskArgs):
         task_id = str(uuid4())
-        args = body.dict()
+        args = _model_to_dict(body)
         checkpoint = args.pop("checkpoint", None)
         vae = args.pop("vae", None)
         callback_url = args.pop("callback_url", None)
@@ -178,7 +184,7 @@ def regsiter_apis(app: App, task_runner: TaskRunner):
         parsed_tasks = []
         for task in pending_tasks:
             params = format_task_args(task)
-            task_data = task.dict()
+            task_data = _model_to_dict(task)
             task_data["params"] = params
             if task.id == current_task_id:
                 task_data["status"] = "running"
@@ -248,7 +254,7 @@ def regsiter_apis(app: App, task_runner: TaskRunner):
         parsed_tasks = []
         for task in tasks:
             params = format_task_args(task)
-            task_data = task.dict()
+            task_data = _model_to_dict(task)
             task_data["params"] = params
             parsed_tasks.append(TaskModel(**task_data))
 
@@ -264,7 +270,7 @@ def regsiter_apis(app: App, task_runner: TaskRunner):
             return {"success": False, "message": "Task not found"}
 
         params = format_task_args(task)
-        task_data = task.dict()
+        task_data = _model_to_dict(task)
         task_data["params"] = params
         if task.id == progress.current_task:
             task_data["status"] = "running"

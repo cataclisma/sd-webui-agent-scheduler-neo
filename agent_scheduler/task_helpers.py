@@ -510,4 +510,4 @@ def serialize_api_task_args(
         if len(init_images) > 1:
             args.batch_size = len(init_images)
 
-    return args.dict()
+    return args.model_dump() if hasattr(args, "model_dump") else args.dict()
